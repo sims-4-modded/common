@@ -4,6 +4,7 @@ add_executable(
   ts4_common_tests
   test_CrashDumpRules.cpp
   test_GameVersion.cpp
+  test_Hotkey.cpp
   test_ModCore.cpp
   test_ModHost.cpp
   test_Result.cpp
