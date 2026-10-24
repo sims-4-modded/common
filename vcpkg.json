@@ -1,0 +1,9 @@
+{
+    "name": "ts4-common",
+    "version-string": "0.1.0",
+    "dependencies": [
+        "nlohmann-json",
+        "spdlog",
+        "gtest"
+    ]
+}

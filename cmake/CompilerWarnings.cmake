@@ -1,0 +1,16 @@
+# Give each target of this project the same warnings. Only C and C++ sources get the flags, because the assembler
+# does not know them.
+function (ts4_set_warnings target)
+  set(languages "$<COMPILE_LANGUAGE:C,CXX>")
+  if (MSVC)
+    target_compile_options(${target} PRIVATE "$<${languages}:/W4;/permissive-;/utf-8;/Zc:__cplusplus>")
+    if (TS4_WARNINGS_AS_ERRORS)
+      target_compile_options(${target} PRIVATE "$<${languages}:/WX>")
+    endif ()
+  else ()
+    target_compile_options(${target} PRIVATE "$<${languages}:-Wall;-Wextra;-Wpedantic>")
+    if (TS4_WARNINGS_AS_ERRORS)
+      target_compile_options(${target} PRIVATE "$<${languages}:-Werror>")
+    endif ()
+  endif ()
+endfunction ()
