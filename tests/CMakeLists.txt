@@ -9,6 +9,7 @@ add_executable(
   test_ModHost.cpp
   test_SettingsFields.cpp
   test_SettingsFile.cpp
+  test_Signature.cpp
   test_StartupGuard.cpp
   test_Result.cpp
 )
