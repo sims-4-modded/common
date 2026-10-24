@@ -37,9 +37,18 @@ target_include_directories(ts4_common INTERFACE src)
 target_compile_features(ts4_common INTERFACE cxx_std_20)
 
 # The parts of the mods that do not need the game: the tests use them with fakes.
-add_library(ts4_mod_core STATIC src/mod_core/GameVersion.h src/mod_core/GameVersion.cpp)
+add_library(
+  ts4_mod_core STATIC
+  src/mod_core/CrashDumpRules.h
+  src/mod_core/FrameCallbacks.h
+  src/mod_core/GameVersion.h
+  src/mod_core/MainThreadTasks.h
+  src/mod_core/SlotSwap.h
+  src/mod_core/FrameCallbacks.cpp
+  src/mod_core/GameVersion.cpp
+)
 target_include_directories(ts4_mod_core PUBLIC src)
-target_link_libraries(ts4_mod_core PUBLIC ts4_common)
+target_link_libraries(ts4_mod_core PUBLIC ts4_common nlohmann_json::nlohmann_json)
 ts4_set_warnings(ts4_mod_core)
 
 # The interface between the extender and a DLL mod: a C header.
