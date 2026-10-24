@@ -18,7 +18,7 @@ target_link_libraries(
 )
 # The tests of the Windows parts use the test exe itself: its sections, its functions and its hooks.
 if (WIN32)
-  target_sources(ts4_common_tests PRIVATE test_Module.cpp test_Scan.cpp)
+  target_sources(ts4_common_tests PRIVATE test_Hooks.cpp test_Module.cpp test_Scan.cpp)
   target_link_libraries(ts4_common_tests PRIVATE ts4_mod_game)
 endif ()
 ts4_set_warnings(ts4_common_tests)

@@ -76,21 +76,28 @@ target_include_directories(ts4_mod_sdk PUBLIC src)
 target_link_libraries(ts4_mod_sdk PUBLIC ts4_mod_api ts4_mod_core ts4_mod_spdlog)
 ts4_set_warnings(ts4_mod_sdk)
 
-# The Windows parts of the extender and the DLL mods in the game process: the modules of the game, the signature scan
-# and the decryption check. The library uses only DLLs of Windows, so it brings no DLL into the game folder.
+# The Windows parts of the extender and the DLL mods in the game process: the modules of the game, the signature scan,
+# the decryption check and the hooks. The library uses only DLLs of Windows, and MinHook is a static library, so it
+# brings no DLL into the game folder.
 if (WIN32)
+  include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/ModMinHook.cmake)
+
   add_library(
     ts4_mod_game STATIC
+    src/mod_game/Guard.h
+    src/mod_game/Hooks.h
     src/mod_game/Module.h
     src/mod_game/Scan.h
     src/mod_game/WideText.h
+    src/mod_game/Guard.cpp
+    src/mod_game/Hooks.cpp
     src/mod_game/Module.cpp
     src/mod_game/Scan.cpp
     src/mod_game/WideText.cpp
   )
   target_include_directories(ts4_mod_game PUBLIC src)
   target_compile_definitions(ts4_mod_game PUBLIC WIN32_LEAN_AND_MEAN NOMINMAX)
-  target_link_libraries(ts4_mod_game PUBLIC ts4_mod_core)
+  target_link_libraries(ts4_mod_game PUBLIC ts4_mod_api ts4_mod_core ts4_mod_spdlog PRIVATE ts4_minhook)
   ts4_set_warnings(ts4_mod_game)
 endif ()
 
