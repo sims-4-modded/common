@@ -40,14 +40,19 @@ target_compile_features(ts4_common INTERFACE cxx_std_20)
 add_library(
   ts4_mod_core STATIC
   src/mod_core/CrashDumpRules.h
+  src/mod_core/Folders.h
   src/mod_core/FrameCallbacks.h
   src/mod_core/GameVersion.h
   src/mod_core/Hotkey.h
   src/mod_core/MainThreadTasks.h
+  src/mod_core/SettingsFields.h
+  src/mod_core/SettingsFile.h
   src/mod_core/SlotSwap.h
+  src/mod_core/Folders.cpp
   src/mod_core/FrameCallbacks.cpp
   src/mod_core/GameVersion.cpp
   src/mod_core/Hotkey.cpp
+  src/mod_core/SettingsFile.cpp
 )
 target_include_directories(ts4_mod_core PUBLIC src)
 target_link_libraries(ts4_mod_core PUBLIC ts4_common nlohmann_json::nlohmann_json)

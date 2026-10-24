@@ -7,6 +7,8 @@ add_executable(
   test_Hotkey.cpp
   test_ModCore.cpp
   test_ModHost.cpp
+  test_SettingsFields.cpp
+  test_SettingsFile.cpp
   test_Result.cpp
 )
 target_link_libraries(
