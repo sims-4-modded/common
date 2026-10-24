@@ -48,11 +48,13 @@ add_library(
   src/mod_core/SettingsFields.h
   src/mod_core/SettingsFile.h
   src/mod_core/SlotSwap.h
+  src/mod_core/StartupGuard.h
   src/mod_core/Folders.cpp
   src/mod_core/FrameCallbacks.cpp
   src/mod_core/GameVersion.cpp
   src/mod_core/Hotkey.cpp
   src/mod_core/SettingsFile.cpp
+  src/mod_core/StartupGuard.cpp
 )
 target_include_directories(ts4_mod_core PUBLIC src)
 target_link_libraries(ts4_mod_core PUBLIC ts4_common nlohmann_json::nlohmann_json)
