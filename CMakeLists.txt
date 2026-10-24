@@ -71,9 +71,9 @@ add_library(ts4_mod_spdlog INTERFACE)
 target_link_libraries(ts4_mod_spdlog INTERFACE spdlog::spdlog)
 
 # The C++ side of the interface in a DLL mod.
-add_library(ts4_mod_sdk STATIC src/mod_sdk/ModHost.h src/mod_sdk/ModHost.cpp)
+add_library(ts4_mod_sdk STATIC src/mod_sdk/HostLogSink.h src/mod_sdk/ModHost.h src/mod_sdk/ModHost.cpp)
 target_include_directories(ts4_mod_sdk PUBLIC src)
-target_link_libraries(ts4_mod_sdk PUBLIC ts4_mod_api ts4_mod_core)
+target_link_libraries(ts4_mod_sdk PUBLIC ts4_mod_api ts4_mod_core ts4_mod_spdlog)
 ts4_set_warnings(ts4_mod_sdk)
 
 if (TS4_COMMON_BUILD_TESTS)
