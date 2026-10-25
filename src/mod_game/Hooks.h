@@ -102,8 +102,9 @@ public:
 		std::uint32_t mainThreadId = 0;
 		/// The filter of the guard around each callback.
 		ExceptionFilter filter = &CatchCallbackFault;
-		/// Called on the main thread after a callback of `owner` failed, with the reason. The callbacks of the owner
-		/// are already stopped.
+		/// The manager calls this function on the main thread after a callback of `owner` failed, and gives the
+		/// reason. The manager already stopped the callbacks of the owner. The function cannot call the manager: post
+		/// a task to remove the owner.
 		std::function<void(HookOwner owner, const std::string& reason)> ownerFailed;
 	};
 

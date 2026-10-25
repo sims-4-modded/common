@@ -55,8 +55,8 @@ struct ModuleSection
 	[[nodiscard]] bool Readable() const;
 };
 
-/// True if the process can read each byte of `bytes` now: each page is committed, and no page is a guard page or has
-/// no access.
+/// True if the process can read each byte of `bytes` now: each page has committed memory, and no page is a guard page
+/// or has no access.
 [[nodiscard]] bool IsReadable(std::span<const std::byte> bytes);
 
 /// A view of a module that the process loaded, for example `TS4_x64.exe` or `Simulation_x64.dll`. The view reads the

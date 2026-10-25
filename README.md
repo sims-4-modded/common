@@ -15,6 +15,7 @@ method.
 | `ts4_mod_core` | `src/mod_core` | Pure logic that does not need the game: the game version, frame callbacks, main-thread tasks, the slot swap of a code pointer, hotkeys (with the Windows virtual-key codes), the settings file, the menu field tables, the folders of the mods, the start-up guard, the crash dump rules and the signatures |
 | `ts4_mod_api` | `src/mod_api` | `mod_api/Ts4ModApi.h`: the C interface between the extender and a DLL mod |
 | `ts4_mod_sdk` | `src/mod_sdk` | The C++ side of that interface in a DLL mod (`ModHost`, `BindFields`, the log sink `HostLogSink`) |
+| `ts4_mod_game` | `src/mod_game` | Windows only: the parts that run in the game process. The modules of the game, the signature scan, the decryption check, the hooks (MinHook), the hotkey input, the crash dumps, the status of a mod and the Python 3.7 C API of the game |
 
 Each library has one folder under `src`, with its headers and sources directly in it. The folder name is the target
 name without `ts4_`. Each library puts `src` on the include path, so an include line names the library folder and the
@@ -22,8 +23,27 @@ file, for example `#include <common/Result.h>` or `#include <mod_core/Signature.
 start with `mod_` where a mod could have the same name (`core`, `game`), so an include path never finds two files.
 The C++ namespaces (`ts4`, `ts4_mod`, `ts4_mod::sdk`, `ts4_mod::settings`) do not follow the folders.
 
-The Windows parts that run in the game (`src/mod_game`: module information, the signature scan of a loaded module,
-the hotkey input, the messages of the game, crash dumps) come in a later step, on this interface.
+## The Windows parts in the game
+
+`ts4_mod_game` (`src/mod_game`, only on Windows) holds the parts of the extender and the DLL mods that run in the
+game process. It is a port of `mod_game` of the Masters of Albion mods, with no IL2CPP and no managed code:
+
+| File | What it does |
+|---|---|
+| `Module.h` | `ModuleImage`: a loaded module by its name (`TS4_x64.exe`, `Simulation_x64.dll`), its base, and a span over its image and over each section. `ReadImageLayout` reads the PE headers with a check of each bound and returns an error for a bad header. |
+| `Scan.h` | `FindUniqueSignature` over the executable sections of a module: the address of the one match, or an error that names the signature and tells the count. `CheckDecrypted` measures the entropy of `.text`, so the extender does not scan `TS4_x64.exe` before the activation wrapper of EA decrypts it. |
+| `Hooks.h` | `HookManager`: the one owner of the native hooks. One MinHook hook for each function, callbacks before and after the function with `Ts4Call` (at most four integer parameters and an integer result), a guard around each callback, and the removal of each hook when the manager goes out of scope. |
+| `Guard.h` | `GuardedCall`: a call that catches a C++ exception and a fault (an access violation, a bad instruction). A fault in a callback stops only the callbacks of its owner. |
+| `HotkeyInput.h` | The hotkeys of `mod_core/Hotkey.h` from the key state of Windows: one action for each press, exact modifier keys, nothing while another process has the keyboard. |
+| `CrashDump.h` | A minidump when a thread fills its stack or when a guard catches a fault. The dumps go to the log folder, and the writer refuses a folder in the game folder. |
+| `ModStatus.h` | The state of one mod for the inspector and the log. |
+| `Python.h` | `PythonApi`: the `Py*` exports of the loaded `python37_x64.dll`, which it finds one time with `GetProcAddress`. `GilGuard` holds the GIL, `PyRef` owns a reference, and each Python exception becomes a `Result` error. A missing export turns off only its group of functions. |
+
+The code uses no RVA: a function of the game comes from a signature in its module. The messages on the screen of
+the game (`GameMessages` of Masters of Albion) are not in this library, because they need the UI of this game.
+
+MinHook comes from its source archive (`cmake/ModMinHook.cmake`, target `ts4_minhook`) and builds as a static library,
+because the vcpkg port of MinHook is a DLL. The archive goes into the download folder of vcpkg on the first configure.
 
 ## The interface between the extender and a mod
 
@@ -113,6 +133,9 @@ add_subdirectory(external/common)
 target_link_libraries(my_mod PRIVATE ts4_mod_sdk)
 ```
 
+The extender also links `ts4_mod_game` for the hooks, the scan and the Python C API. It can include
+`external/common/cmake/ModMinHook.cmake` for its own use of MinHook: the file makes `ts4_minhook` only one time.
+
 The submodule URL is the absolute local path `D:/sims_4/projects/common`. Git refuses local file submodules by
 default, so each submodule command needs `-c protocol.file.allow=always`. The project of the mod sets
 `CMAKE_MSVC_RUNTIME_LIBRARY` to the static C runtime and uses the same vcpkg triplet.
@@ -121,3 +144,8 @@ default, so each submodule command needs `-c protocol.file.allow=always`. The pr
 
 The tests (GoogleTest, `tests/`) cover the pure parts with fakes, never with the game or game data.
 `ctest --preset x64-release` runs them.
+
+The tests of `ts4_mod_game` use the test exe itself: its PE headers and sections, a function with known bytes in a
+section of code for the signature scan, and functions of the exe for the hooks. The tests of `Python.h` load the
+Python 3.7.0 of the developer from `C:\lib\python37\python37.dll` (the same version as the game) and start it in
+the test process. If that DLL is not there, GoogleTest skips these tests. No test loads a file from the game folder.

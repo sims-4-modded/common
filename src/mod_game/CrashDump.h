@@ -34,8 +34,8 @@ namespace ts4_mod
 [[nodiscard]] bool CrashDumpWriterInstalled();
 
 /// The filter of a guard of the extender (see `GuardedCall`). For each fault that `CatchCallbackFault` catches, write
-/// a dump (if the writer is installed) and return `EXCEPTION_EXECUTE_HANDLER`. For any other exception, return
-/// `EXCEPTION_CONTINUE_SEARCH`.
+/// a dump (if the extender installed the writer) and return `EXCEPTION_EXECUTE_HANDLER`. For any other exception,
+/// return `EXCEPTION_CONTINUE_SEARCH`.
 [[nodiscard]] int CatchCallbackFaultWithDump(_EXCEPTION_POINTERS* pointers);
 
 } // namespace ts4_mod
