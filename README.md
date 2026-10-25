@@ -32,7 +32,7 @@ game process. It is a port of `mod_game` of the Masters of Albion mods, with no 
 |---|---|
 | `Module.h` | `ModuleImage`: a loaded module by its name (`TS4_x64.exe`, `Simulation_x64.dll`), its base, and a span over its image and over each section. `ReadImageLayout` reads the PE headers with a check of each bound and returns an error for a bad header. |
 | `Scan.h` | `FindUniqueSignature` over the executable sections of a module: the address of the one match, or an error that names the signature and tells the count. `CheckDecrypted` measures the entropy of `.text`, so the extender does not scan `TS4_x64.exe` before the activation wrapper of EA decrypts it. |
-| `Hooks.h` | `HookManager`: the one owner of the native hooks. One MinHook hook for each function, callbacks before and after the function with `Ts4Call` (at most four integer parameters and an integer result), a guard around each callback, and the removal of each hook when the manager goes out of scope. |
+| `Hooks.h`, `HookThunk.asm` | `HookManager`: the one owner of the native hooks. One MinHook hook for each function, callbacks before and after the function with `Ts4Call` (at most four integer parameters and an integer result), a guard around each callback, and the removal of each hook when the manager goes out of scope. An x64 thunk (`HookThunk.asm`) keeps every argument of the hooked function, so a function with more than four arguments, a floating-point argument, or a floating-point result works. The callback still reads at most four integer parameters. |
 | `Guard.h` | `GuardedCall`: a call that catches a C++ exception and a fault (an access violation, a bad instruction). A fault in a callback stops only the callbacks of its owner. |
 | `HotkeyInput.h` | The hotkeys of `mod_core/Hotkey.h` from the key state of Windows: one action for each press, exact modifier keys, nothing while another process has the keyboard. |
 | `CrashDump.h` | A minidump when a thread fills its stack or when a guard catches a fault. The dumps go to the log folder, and the writer refuses a folder in the game folder. |
@@ -44,6 +44,23 @@ the game (`GameMessages` of Masters of Albion) are not in this library, because 
 
 MinHook comes from its source archive (`cmake/ModMinHook.cmake`, target `ts4_minhook`) and builds as a static library,
 because the vcpkg port of MinHook is a DLL. The archive goes into the download folder of vcpkg on the first configure.
+
+The hook thunk (`HookThunk.asm`, MASM `ml64`) keeps the arguments of a hooked function. MinHook makes the game jump
+to a stub for the hook place. The stub goes to a common thunk. The thunk saves the integer registers and the vector
+registers. It runs the callbacks of the before phase through a C++ dispatcher. Then it restores the registers and
+jumps to the MinHook trampoline. The original function runs on the stack of the caller. Thus the stack arguments and
+the vector arguments stay in place, and a floating-point result comes back with no change.
+
+A hook with a callback of the after phase needs the result of the call. The thunk puts a return thunk in place of
+the return address. It keeps the call on a per-thread shadow stack with a bound. The original function returns into
+the return thunk. The return thunk runs the callbacks of the after phase. Then it goes to the real return address. A
+very deep recursion that goes past the bound runs only the original function for the deeper calls.
+
+Limit: a function that does not return in the normal way must not have a callback of the after phase. For example, the
+function throws a C++ exception, or another function unwinds the stack through it. The exception goes to the caller
+with no change. But the return thunk does not run. Thus the after callbacks of that call do not run, and the call
+keeps its place on the shadow stack until the thread uses that place again. A hook with only a before callback takes
+the fast path with no shadow stack, so an exception through it is safe.
 
 ## The interface between the extender and a mod
 
