@@ -10,17 +10,23 @@
 #include <exception>
 #include <format>
 #include <utility>
+#include <vector>
 
 #include <MinHook.h>
 #include <spdlog/spdlog.h>
 #include <windows.h>
+
+/// The table of the thunk stubs, one for each hook place, from the file HookThunk.asm. The C++ code gives one stub to
+/// MinHook for each hook place, because a code pointer cannot carry the place index.
+extern "C" void* HookThunkTable[]; // NOLINT(modernize-avoid-c-arrays)
 
 namespace ts4_mod
 {
 
 namespace
 {
-/// The type of a native function that the hooks support: four integer registers in, one integer register out.
+/// The type of the trampoline of MinHook, which runs the original function. The hooks give the arguments to the
+/// original function through the thunk, so this type only names the trampoline for the store of its address.
 using NativeFunction = std::uintptr_t (*)(std::uintptr_t, std::uintptr_t, std::uintptr_t, std::uintptr_t);
 
 /// One callback and its state. The list of a hook and the status share it.
@@ -59,25 +65,10 @@ struct Slot
 
 std::array<Slot, k_MaxHooks> s_slots;
 
+static_assert(k_MaxHooks == 64, "The file HookThunk.asm makes 64 stubs. Keep the two numbers the same.");
+
 /// The depth of the callbacks on this thread. The functions of the manager refuse to run in a callback.
 thread_local int t_callbackDepth = 0;
-
-/// Count a call in progress through a place, also if the original function throws.
-class ActiveCall
-{
-public:
-	explicit ActiveCall(Slot& slot)
-	    : _slot(slot)
-	{
-		_slot.active.fetch_add(1, std::memory_order_acq_rel);
-	}
-	~ActiveCall() { _slot.active.fetch_sub(1, std::memory_order_acq_rel); }
-	ActiveCall(const ActiveCall&) = delete;
-	ActiveCall& operator=(const ActiveCall&) = delete;
-
-private:
-	Slot& _slot;
-};
 
 [[nodiscard]] const char* PhaseName(HookPhase phase)
 {
@@ -112,22 +103,12 @@ struct HookManager::Hook
 	/// manager, and never while the callbacks run.
 	std::vector<std::shared_ptr<CallbackEntry>> callbacks;
 
-	/// Run the callbacks and the original function. The hook entry calls it on the main thread.
-	std::uintptr_t Call(Slot& place, NativeFunction original, const std::array<std::uintptr_t, 4>& arguments)
+	/// True if the hook has a callback for `phase` that did not stop.
+	[[nodiscard]] bool HasPhase(HookPhase phase) const
 	{
-		calls.fetch_add(1, std::memory_order_relaxed);
-		Ts4Call call {};
-		std::ranges::copy(arguments, call.arguments);
-		Run(place, HookPhase::Before, call);
-		const auto result = original(arguments[0], arguments[1], arguments[2], arguments[3]);
-		// A callback or the original function can remove the hook. Then this object does not exist any more.
-		if (place.hook.load(std::memory_order_acquire) != this)
-		{
-			return result;
-		}
-		call.result = result;
-		Run(place, HookPhase::After, call);
-		return result;
+		return std::ranges::any_of(callbacks, [phase](const auto& entry) {
+			return entry->callback.phase == phase && !entry->stopped.load(std::memory_order_relaxed);
+		});
 	}
 
 	void Run(Slot& place, HookPhase phase, const Ts4Call& call)
@@ -169,37 +150,91 @@ struct HookManager::Hook
 
 namespace
 {
-/// The code that the game calls in place of the function of the hook in place `Index`. A C++ exception from the
-/// original function goes back to the game through this function, as if the hook did not exist.
-template <std::size_t Index>
-std::uintptr_t HookEntry(std::uintptr_t first, std::uintptr_t second, std::uintptr_t third, std::uintptr_t fourth)
+/// One call in progress that has an AFTER callback. The thunk puts the return thunk in place of the return address,
+/// so the original function returns into the thunk. The thunk keeps the real return address, the place and the
+/// arguments here until the original function returns.
+struct ShadowFrame
 {
-	auto& slot = s_slots[Index];
-	const ActiveCall active(slot);
+	void* realReturn = nullptr;
+	Slot* slot = nullptr;
+	HookManager::Hook* hook = nullptr;
+	std::array<std::uintptr_t, 4> arguments {};
+};
+
+/// The highest number of calls with an AFTER callback that can be in progress at one time on one thread. The thunk
+/// runs only the original function for a call that is deeper than this, so a very deep recursion cannot grow the list
+/// without a bound.
+inline constexpr std::size_t k_MaxShadowDepth = 256;
+
+/// The calls with an AFTER callback that are in progress on this thread, newest last. The original functions return
+/// in the reverse order of the calls, so the thunk reads and removes the last frame.
+thread_local std::vector<ShadowFrame> t_shadow;
+} // namespace
+
+/// Run the BEFORE callbacks and tell the thunk what to do next. The thunk calls it on each call of a hooked function,
+/// with the place index, a pointer to the four saved integer arguments, and the real return address. It returns the
+/// MinHook trampoline for the thunk to jump to, or null if the original function is gone. It sets `*needAfter` to 1
+/// if the thunk must run the AFTER callbacks after the original function.
+extern "C" void* HookDispatchBefore(std::size_t index, const std::uintptr_t* savedArguments, void* realReturn, int* needAfter)
+{
+	*needAfter = 0;
+	auto& slot = s_slots[index];
+	slot.active.fetch_add(1, std::memory_order_acq_rel);
 	const auto original = slot.original.load(std::memory_order_acquire);
 	if (original == nullptr)
 	{
-		return 0;
+		slot.active.fetch_sub(1, std::memory_order_acq_rel);
+		return nullptr;
 	}
-	if (GetCurrentThreadId() == slot.mainThreadId.load(std::memory_order_relaxed) && !slot.inCallbacks)
+	// A call on another thread, or a call from a callback of the same hook, runs only the original function.
+	const bool onMainThread = GetCurrentThreadId() == slot.mainThreadId.load(std::memory_order_relaxed) && !slot.inCallbacks;
+	auto* hook = onMainThread ? slot.hook.load(std::memory_order_acquire) : nullptr;
+	if (hook == nullptr)
 	{
-		if (auto* hook = slot.hook.load(std::memory_order_acquire); hook != nullptr)
-		{
-			return hook->Call(slot, original, {first, second, third, fourth});
-		}
+		slot.directCalls.fetch_add(1, std::memory_order_relaxed);
+		slot.active.fetch_sub(1, std::memory_order_acq_rel);
+		return reinterpret_cast<void*>(original);
 	}
-	slot.directCalls.fetch_add(1, std::memory_order_relaxed);
-	return original(first, second, third, fourth);
+	hook->calls.fetch_add(1, std::memory_order_relaxed);
+	const std::array<std::uintptr_t, 4> arguments {savedArguments[0], savedArguments[1], savedArguments[2], savedArguments[3]};
+	Ts4Call call {};
+	std::ranges::copy(arguments, call.arguments);
+	hook->Run(slot, HookPhase::Before, call);
+	// A callback cannot remove the hook, but the test of the pointer keeps the code safe.
+	const bool present = slot.hook.load(std::memory_order_acquire) == hook;
+	if (!present || !hook->HasPhase(HookPhase::After) || t_shadow.size() >= k_MaxShadowDepth)
+	{
+		slot.active.fetch_sub(1, std::memory_order_acq_rel);
+		return reinterpret_cast<void*>(original);
+	}
+	t_shadow.push_back(ShadowFrame {
+	    .realReturn = realReturn,
+	    .slot = &slot,
+	    .hook = hook,
+	    .arguments = arguments,
+	});
+	*needAfter = 1;
+	// Keep the count of the active calls until HookDispatchAfter runs.
+	return reinterpret_cast<void*>(original);
 }
 
-template <std::size_t... Indices>
-constexpr std::array<NativeFunction, k_MaxHooks> MakeEntries(std::index_sequence<Indices...> /*indices*/)
+/// Run the AFTER callbacks and return the real return address of the call. The return thunk calls it when the
+/// original function returns, with the integer result. It reads and removes the last frame of this thread.
+extern "C" void* HookDispatchAfter(std::uintptr_t result)
 {
-	return {&HookEntry<Indices>...};
+	const ShadowFrame frame = t_shadow.back();
+	t_shadow.pop_back();
+	auto& slot = *frame.slot;
+	if (slot.hook.load(std::memory_order_acquire) == frame.hook)
+	{
+		Ts4Call call {};
+		std::ranges::copy(frame.arguments, call.arguments);
+		call.result = result;
+		frame.hook->Run(slot, HookPhase::After, call);
+	}
+	slot.active.fetch_sub(1, std::memory_order_acq_rel);
+	return frame.realReturn;
 }
-
-constexpr std::array<NativeFunction, k_MaxHooks> k_Entries = MakeEntries(std::make_index_sequence<k_MaxHooks>());
-} // namespace
 
 HookManager::HookManager(Options options)
     : _options(std::move(options))
@@ -297,7 +332,7 @@ ts4::Result<void> HookManager::AddCallback(const void* target, std::string_view 
 	auto& slot = s_slots[index];
 	auto* code = const_cast<void*>(target);
 	void* original = nullptr;
-	if (const auto status = MH_CreateHook(code, reinterpret_cast<void*>(k_Entries[index]), &original); status != MH_OK)
+	if (const auto status = MH_CreateHook(code, HookThunkTable[index], &original); status != MH_OK)
 	{
 		slot.inUse = false;
 		if (status == MH_ERROR_ALREADY_CREATED)

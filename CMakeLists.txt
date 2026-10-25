@@ -82,6 +82,9 @@ ts4_set_warnings(ts4_mod_sdk)
 if (WIN32)
   include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/ModMinHook.cmake)
 
+  # The hooks use an assembly thunk, so the thunk keeps every argument of a hooked function. MASM (ml64) builds it.
+  enable_language(ASM_MASM)
+
   add_library(
     ts4_mod_game STATIC
     src/mod_game/CrashDump.h
@@ -96,6 +99,7 @@ if (WIN32)
     src/mod_game/CrashDump.cpp
     src/mod_game/Guard.cpp
     src/mod_game/Hooks.cpp
+    src/mod_game/HookThunk.asm
     src/mod_game/HotkeyInput.cpp
     src/mod_game/Module.cpp
     src/mod_game/Python.cpp
