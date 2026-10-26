@@ -73,24 +73,41 @@ constexpr std::string_view k_CoreExports[] = {
 	return nullptr;
 }
 
-/// The interpreter of the tests: the Python 3.7.0 of the developer in `C:\lib\python37`, which has the same version as
-/// the interpreter of the game. The tests never load a file from the game folder. If the interpreter is not there, the
-/// tests of this suite are skipped.
-constexpr wchar_t k_PythonHome[] = L"C:\\lib\\python37";
-constexpr wchar_t k_PythonDll[] = L"C:\\lib\\python37\\python37.dll";
+/// The interpreter of the tests: the Python 3.7 of the developer in the folder that the environment variable
+/// `TS4_PYTHON37` gives. It has the same version as the interpreter of the game. The tests never load a file from the
+/// game folder. If the variable is not set, or the folder has no interpreter, the tests of this suite are skipped.
+[[nodiscard]] std::filesystem::path PythonHome()
+{
+	const auto size = GetEnvironmentVariableW(L"TS4_PYTHON37", nullptr, 0);
+	if (size == 0)
+	{
+		return {};
+	}
+	std::wstring value(size, L'\0');
+	const auto written = GetEnvironmentVariableW(L"TS4_PYTHON37", value.data(), size);
+	value.resize(written);
+	return value;
+}
 
 class PythonInterpreter: public ::testing::Test
 {
 protected:
 	static void SetUpTestSuite()
 	{
-		if (!std::filesystem::exists(k_PythonDll))
+		const auto home = PythonHome();
+		if (home.empty())
 		{
-			s_reason = "C:\\lib\\python37\\python37.dll is not there";
+			s_reason = "the environment variable TS4_PYTHON37 does not give the folder of Python 3.7";
+			return;
+		}
+		const auto dll = home / L"python37.dll";
+		if (!std::filesystem::exists(dll))
+		{
+			s_reason = dll.string() + " is not there";
 			return;
 		}
 		// The DLL of the interpreter loads its C runtime from its own folder.
-		s_module = LoadLibraryExW(k_PythonDll, nullptr, LOAD_WITH_ALTERED_SEARCH_PATH);
+		s_module = LoadLibraryExW(dll.c_str(), nullptr, LOAD_WITH_ALTERED_SEARCH_PATH);
 		if (s_module == nullptr)
 		{
 			s_reason = "python37.dll did not load";
@@ -119,7 +136,8 @@ protected:
 		}
 		// The interpreter of the tests does not import site, so the packages of the developer do not change it.
 		*noSite = 1;
-		setHome(k_PythonHome);
+		s_home = home.wstring();
+		setHome(s_home.c_str());
 		initialize(0);
 		// The main thread gives the GIL back, so that each test gets it with a GilGuard.
 		s_threadState = saveThread();
@@ -156,6 +174,8 @@ protected:
 	static inline void* s_threadState = nullptr;
 	static inline std::optional<PythonApi> s_api;
 	static inline std::string s_reason;
+	/// Py_SetPythonHome keeps the pointer, so the text must live as long as the interpreter.
+	static inline std::wstring s_home;
 };
 
 } // namespace

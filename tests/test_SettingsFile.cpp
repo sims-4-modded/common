@@ -131,11 +131,11 @@ TEST(Folders, UsesThePathsThatTheUserGives)
 {
 	const std::vector<std::filesystem::path> games {"F:/Origin Games/The Sims 4"};
 	const auto folders = MakeModFolders(
-	    {.localAppData = "C:/Local", .settingsFile = "D:/runs/test/mods.json", .logFolder = "D:/runs/test/logs"}, games);
+	    {.localAppData = "C:/Local", .settingsFile = "E:/runs/test/mods.json", .logFolder = "E:/runs/test/logs"}, games);
 	ASSERT_TRUE(folders) << folders.GetError().message;
-	EXPECT_EQ(folders->settingsFile, std::filesystem::path("D:/runs/test/mods.json"));
-	EXPECT_EQ(folders->logFolder, std::filesystem::path("D:/runs/test/logs"));
-	EXPECT_EQ(folders->startupMarker, std::filesystem::path("D:/runs/test/startup-marker.json"));
+	EXPECT_EQ(folders->settingsFile, std::filesystem::path("E:/runs/test/mods.json"));
+	EXPECT_EQ(folders->logFolder, std::filesystem::path("E:/runs/test/logs"));
+	EXPECT_EQ(folders->startupMarker, std::filesystem::path("E:/runs/test/startup-marker.json"));
 }
 
 TEST(Folders, RefusesAFolderInTheGameFolder)

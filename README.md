@@ -3,7 +3,11 @@
 The shared code of the mod loader (the script extender) and the DLL mods of The Sims 4. The mod loader
 (`mod_loader`) and each DLL mod include this repository as a git submodule (`external/common`).
 
-The code is a port of the shared code of the Masters of Albion mods (`D:\masters_of_albion\projects\common`) for this
+In this README, `<workspace>` is the folder that holds `projects`: this repository is `<workspace>\projects\common`,
+and a worktree of it is `<workspace>\worktrees\<name>`. The environment variable `TS4_WORKSPACE` can give another
+folder.
+
+The code is a port of the shared code of the Masters of Albion mods (`projects/common` of that workspace) for this
 game. The Unity and IL2CPP parts are not in it: a native function of the game has a signature in place of a managed
 method.
 
@@ -121,7 +125,7 @@ the extender never writes into the game folder.
 
 ## Build
 
-Requirements: Visual Studio with the C++ tools, and the vcpkg checkout `D:\sims_4\vcpkg`.
+Requirements: Visual Studio with the C++ tools, and the vcpkg checkout `<workspace>\vcpkg`.
 
 ```bat
 tools\preset.bat x64-release
@@ -133,16 +137,17 @@ The script prepares the MSVC x64 environment, then configures, compiles and test
 
 The dependencies come from vcpkg in manifest mode (`vcpkg.json`): nlohmann-json, spdlog (with fmt) and GoogleTest,
 with the triplet `x64-windows-static`. Every DLL that goes to the game uses the static C runtime, so no other DLL
-goes there. The presets use:
+goes there. The presets find these folders from the parent folder of the source folder (`${sourceParentDir}` is
+`<workspace>\projects` or `<workspace>\worktrees`), so a repository and its worktrees use the same folders:
 
-- `VCPKG_ROOT` = `D:/sims_4/vcpkg`,
-- `VCPKG_DEFAULT_BINARY_CACHE` = `D:/sims_4/cache/vcpkg-archives`,
-- `VCPKG_DOWNLOADS` = `D:/sims_4/cache/vcpkg-downloads`.
+- `VCPKG_ROOT` = `<workspace>/vcpkg`,
+- `VCPKG_DEFAULT_BINARY_CACHE` = `<workspace>/cache/vcpkg-archives`,
+- `VCPKG_DOWNLOADS` = `<workspace>/cache/vcpkg-downloads`.
 
 ## Use in a mod project
 
 ```sh
-git -c protocol.file.allow=always submodule add D:/sims_4/projects/common external/common
+git -c protocol.file.allow=always submodule add ../common external/common
 ```
 
 ```cmake
@@ -153,8 +158,10 @@ target_link_libraries(my_mod PRIVATE ts4_mod_sdk)
 The extender also links `ts4_mod_game` for the hooks, the scan and the Python C API. It can include
 `external/common/cmake/ModMinHook.cmake` for its own use of MinHook: the file makes `ts4_minhook` only one time.
 
-The submodule URL is the absolute local path `D:/sims_4/projects/common`. Git refuses local file submodules by
-default, so each submodule command needs `-c protocol.file.allow=always`. The project of the mod sets
+The submodule URL `../common` is relative to the URL of the mod repository, so it also works for a remote of the same
+organization. A local clone with no remote keeps the absolute path of `<workspace>\projects\common` in
+`submodule.external/common.url` of its own `.git/config` (`git submodule init` writes it). Git refuses local file
+submodules by default, so each submodule command needs `-c protocol.file.allow=always`. The project of the mod sets
 `CMAKE_MSVC_RUNTIME_LIBRARY` to the static C runtime and uses the same vcpkg triplet.
 
 ## Tests
@@ -164,5 +171,6 @@ The tests (GoogleTest, `tests/`) cover the pure parts with fakes, never with the
 
 The tests of `ts4_mod_game` use the test exe itself: its PE headers and sections, a function with known bytes in a
 section of code for the signature scan, and functions of the exe for the hooks. The tests of `Python.h` load the
-Python 3.7.0 of the developer from `C:\lib\python37\python37.dll` (the same version as the game) and start it in
-the test process. If that DLL is not there, GoogleTest skips these tests. No test loads a file from the game folder.
+Python 3.7 of the developer (the same version as the game) and start it in the test process. The environment variable
+`TS4_PYTHON37` gives its folder; if it is not set, CMake asks the Python launcher (`py -3.7`) at the configure step.
+If CMake finds no Python 3.7, GoogleTest skips these tests. No test loads a file from the game folder.

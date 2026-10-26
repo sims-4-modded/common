@@ -23,5 +23,14 @@ if (WIN32)
 endif ()
 ts4_set_warnings(ts4_common_tests)
 
+# The tests of Python.h start Python 3.7 from the folder in TS4_PYTHON37. If CMake finds no Python 3.7, these tests
+# are skipped.
+include(${PROJECT_SOURCE_DIR}/cmake/Python37.cmake)
 include(GoogleTest)
-gtest_discover_tests(ts4_common_tests DISCOVERY_MODE PRE_TEST)
+if (TS4_PYTHON37_DIR)
+  file(TO_NATIVE_PATH "${TS4_PYTHON37_DIR}" _ts4_python37_native)
+  gtest_discover_tests(ts4_common_tests DISCOVERY_MODE PRE_TEST PROPERTIES ENVIRONMENT "TS4_PYTHON37=${_ts4_python37_native}")
+else ()
+  message(STATUS "CMake found no Python 3.7: the tests of Python.h are skipped")
+  gtest_discover_tests(ts4_common_tests DISCOVERY_MODE PRE_TEST)
+endif ()
