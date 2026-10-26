@@ -22,10 +22,20 @@
  * - `Ts4ModShutdown` tells the mod that the game stops or that the extender unloads the mod. The mod puts back each
  *   value of the game that it changed. After the call, the extender calls no function of the mod.
  *
- * Threads: `Ts4ModInit` and `Ts4ModShutdown` run on the main thread. The first call of each settings function also
- * runs on the main thread, after all inits and before the first tick. All other callbacks of the extender (function
- * callbacks, tasks, later settings, fields, actions, readouts, queries) run on the main thread, between two ticks or
- * in a frame. A mod can call `log`, `postTask` and `listQueries` of the table from any thread.
+ * Threads: two threads of the game are important to a mod.
+ * - The client main thread (in this interface, "the main thread") runs the main loop of the client. Each frame, it
+ *   calls the tick of the extender. The extender runs these on this thread: `Ts4ModInit` (in the first tick),
+ *   `Ts4ModShutdown`, the settings functions, the tasks, the fields, the actions, the readouts, the queries and the
+ *   menu bar.
+ * - The simulation thread runs the simulation, the game Python and the cheat commands. A call from a script mod
+ *   or from game Python into a DLL mod comes on this thread, not on the main thread.
+ *
+ * A function callback runs on the thread that calls the native function. The functions of the client (for example
+ * the render of a frame) run on the main thread. A mod must know the thread of each function that it hooks.
+ *
+ * The first call of each settings function comes in the first tick, after all inits and before the first work of the
+ * tick. A mod can call `log`, `postTask` and `listQueries` of the table from any thread. To change the state of the
+ * client from the simulation thread, a mod posts a task, or it keeps the state that two threads share under a lock.
  *
  * The size of the table: the extender can add functions at the end of `Ts4HostApi` with no change of the version. A
  * mod checks `size` with `TS4_HOST_API_HAS` before it uses a function after `TS4_HOST_API_FIRST_SIZE`. An older
