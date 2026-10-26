@@ -25,13 +25,15 @@
  * Threads: two threads of the game are important to a mod.
  * - The client main thread (in this interface, "the main thread") runs the main loop of the client. Each frame, it
  *   calls the tick of the extender. The extender runs these on this thread: `Ts4ModInit` (in the first tick),
- *   `Ts4ModShutdown`, the settings functions, the tasks, the fields, the actions, the readouts, the queries and the
- *   menu bar.
+ *   `Ts4ModShutdown`, the settings functions, the tasks, and the fields, the actions and the readouts of the menu bar.
+ *   The queries also run on this thread.
  * - The simulation thread runs the simulation, the game Python and the cheat commands. A call from a script mod
  *   or from game Python into a DLL mod comes on this thread, not on the main thread.
  *
- * A function callback runs on the thread that calls the native function. The functions of the client (for example
- * the render of a frame) run on the main thread. A mod must know the thread of each function that it hooks.
+ * A function callback runs on the thread that calls the native function. The functions that the main loop of the
+ * client calls run on the main thread. The swap chain of the game presents on a third thread, the render thread: the
+ * menu bar draws there, but it calls no function of a mod there. A mod must know the thread of each function that it
+ * hooks.
  *
  * The first call of each settings function comes in the first tick, after all inits and before the first work of the
  * tick. A mod can call `log`, `postTask` and `listQueries` of the table from any thread. To change the state of the
