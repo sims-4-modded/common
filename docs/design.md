@@ -18,6 +18,34 @@ method.
 | `ts4_mod_sdk` | `src/mod_sdk` | The C++ side of that interface in a DLL mod (`ModHost`, `BindFields`, the log sink `HostLogSink`) |
 | `ts4_mod_game` | `src/mod_game` | Windows only: the parts that run in the game process. The modules of the game, the signature scan, the decryption check, the hooks (MinHook), the hotkey input, the crash dumps, the status of a mod and the Python 3.7 C API of the game |
 
+The diagram shows the links between the libraries. An arrow points to a library that the source library uses. The
+dashed arrow is not a link: `ts4_mod_game` finds the Python functions in the DLL of the game when it runs.
+
+```mermaid
+flowchart TD
+    sdk["ts4_mod_sdk<br>(ModHost)"]
+    api["ts4_mod_api<br>(C header)"]
+    core["ts4_mod_core<br>(pure logic)"]
+    common["ts4_common<br>(Result)"]
+    json["nlohmann-json"]
+    spdlog["spdlog with fmt"]
+    subgraph windows["Windows only"]
+        game["ts4_mod_game<br>(in the game process)"]
+        minhook["ts4_minhook<br>(MinHook, static)"]
+        python["python37_x64.dll<br>of the game"]
+    end
+    sdk --> api
+    sdk --> core
+    sdk --> spdlog
+    game --> api
+    game --> core
+    game --> spdlog
+    game -- private --> minhook
+    game -. "GetProcAddress" .-> python
+    core --> common
+    core --> json
+```
+
 Each library has one folder under `src`, with its headers and sources directly in it. The folder name is the target
 name without `ts4_`. Each library puts `src` on the include path, so an include line names the library folder and the
 file, for example `#include <common/Result.h>` or `#include <mod_core/Signature.h>`. The folder names of common
@@ -63,6 +91,42 @@ with no change. But the return thunk does not run. Thus the after callbacks of t
 keeps its place on the shadow stack until the thread uses that place again. A hook with only a before callback takes
 the fast path with no shadow stack, so an exception through it is safe.
 
+The diagram shows one call of a hooked function. The callbacks run only on the main thread of the hook manager. A
+call on another thread, or a call of the same function from one of its callbacks, runs only the original function.
+
+```mermaid
+sequenceDiagram
+    participant C as Caller in the game
+    participant T as Stub and thunk
+    participant H as Hook manager
+    participant O as Original function
+    participant R as Return thunk
+    C->>T: call the function (the MinHook jump)
+    T->>T: save the integer and vector registers
+    T->>H: before phase
+    alt another thread, or a call from a callback
+        H-->>T: run only the original
+    else the main thread
+        H->>H: run the before callbacks, each in a guard
+        opt an after callback, and the shadow stack has space
+            H->>H: keep the call on the shadow stack of the thread
+        end
+    end
+    T->>T: restore the registers
+    opt the call is on the shadow stack
+        T->>T: put the return thunk in place of the return address
+    end
+    T->>O: jump to the MinHook trampoline, on the stack of the caller
+    alt the call is on the shadow stack
+        O->>R: return with the result
+        R->>H: after phase
+        H->>H: remove the call, run the after callbacks
+        R-->>C: go to the real return address
+    else
+        O-->>C: return with no change
+    end
+```
+
 ## The interface between the extender and a mod
 
 `src/mod_api/Ts4ModApi.h` is a versioned C interface (`TS4_MOD_API_VERSION`, now 1), on the model of the Masters of
@@ -72,6 +136,76 @@ their own copy of the standard library.
 A DLL mod exports `Ts4ModApiVersion`, `Ts4ModGetInfo`, `Ts4ModInit` and `Ts4ModShutdown`. The extender refuses a mod
 with a different interface version. If `Ts4ModInit` returns 0, the extender removes the registrations of the mod,
 unloads it, writes the reason to the log, and the game continues.
+
+The diagram shows how the extender (the `mod_loader` project) starts and loads the DLL mods. The DLL mods are in the
+folder `dlls` next to `mods.json`. Each failure that the diagram does not show turns off only its part and writes one
+line to the log.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant G as Game (TS4_x64.exe)
+    participant P as Proxy winmm.dll
+    participant S as Start thread
+    participant M as Main thread
+    participant D as DLL mod
+    G->>P: load winmm.dll from Game\Bin
+    P->>P: load the system winmm.dll
+    P-->>G: send each winmm call to the system DLL
+    P->>S: start one thread (only in TS4_x64.exe)
+    loop until the code is decrypted
+        S->>S: measure the entropy of the code section
+    end
+    S->>S: read mods.json, find the DLLs in the folder
+    S->>S: start-up guard: read the last marker, write a new one
+    S->>G: find the tick and the quit function by signature
+    S->>G: put the bootstrap hook on the tick
+    G->>M: first tick, through the bootstrap hook
+    loop each DLL, in the order of the names
+        alt mods.json or the guard turns the file off
+            M->>M: keep it in the list as off
+        else
+            M->>M: marker stage, SHA-256 of the file
+            M->>D: LoadLibraryEx
+            M->>D: Ts4ModApiVersion
+            opt a missing export or a different version
+                M->>D: refuse the mod and unload it
+            end
+            M->>D: Ts4ModGetInfo
+            opt a bad or a second id, or mods.disabled
+                M->>D: refuse or turn off, unload
+            end
+            M->>D: Ts4ModInit with the host table
+            D->>M: settings, fields, actions, queries, callbacks
+            opt the init returns 0
+                M->>D: remove its registrations, unload
+            end
+        end
+    end
+    M->>D: give each mod its sections of mods.json
+    M->>M: use the hotkeys
+    M->>M: make the hook manager, add the quit hook
+    loop each tick until the modules of the hooks are loaded
+        M->>G: find each function of the mods, put the hooks
+    end
+    M->>G: remove the bootstrap hook
+    M->>M: the hook manager takes the tick
+    loop each later tick
+        G->>M: tick
+        M->>D: hotkeys, menu fields, tasks
+        G->>M: call of a hooked function
+        M->>D: before and after callbacks
+        opt the tick of the late start
+            M->>M: start the settings watcher and the menu bar
+        end
+        opt the stable tick
+            M->>M: remove the marker
+        end
+    end
+    G->>M: quit (the quit hook)
+    M->>D: Ts4ModShutdown, in the reverse order of the loads
+    M->>M: remove the marker
+```
 
 The table of the extender (`Ts4HostApi`) gives:
 
@@ -154,6 +288,31 @@ target_link_libraries(my_mod PRIVATE ts4_mod_sdk)
 
 The extender also links `ts4_mod_game` for the hooks, the scan and the Python C API. It can include
 `external/common/cmake/ModMinHook.cmake` for its own use of MinHook: the file makes `ts4_minhook` only one time.
+
+The diagram shows how the projects use common. Each project has common as the submodule `external/common`. A DLL
+mod that needs the hooks, the scan or the Python C API in its own code also links `ts4_mod_game`.
+
+```mermaid
+flowchart LR
+    loader["mod_loader<br>(the extender)"]
+    template["mod_template"]
+    mod["a DLL mod<br>(a copy of mod_template)"]
+    subgraph common["common (external/common)"]
+        sdk["ts4_mod_sdk"]
+        game["ts4_mod_game"]
+        api["ts4_mod_api"]
+        core["ts4_mod_core"]
+    end
+    template -- copy --> mod
+    loader --> api
+    loader --> core
+    loader --> game
+    template --> sdk
+    template --> core
+    mod --> sdk
+    mod --> core
+    mod -. "if necessary" .-> game
+```
 
 The submodule URL `../common` is relative to the URL of the mod repository, so it also works for a remote of the same
 organization. A local clone with no remote keeps the absolute path of `<workspace>\projects\common` in
