@@ -29,13 +29,39 @@ struct NamedKey
 };
 
 constexpr std::array<NamedKey, 33> k_NamedKeys {{
-    {"Home", 0x24},       {"End", 0x23},          {"Insert", 0x2D},       {"Delete", 0x2E},         {"PageUp", 0x21},
-    {"PageDown", 0x22},   {"Pause", 0x13},        {"ScrollLock", 0x91},   {"Backquote", 0xC0},      {"Minus", 0xBD},
-    {"Equals", 0xBB},     {"LeftBracket", 0xDB},  {"RightBracket", 0xDD}, {"Semicolon", 0xBA},      {"Quote", 0xDE},
-    {"Comma", 0xBC},      {"Period", 0xBE},       {"Slash", 0xBF},        {"Backslash", 0xDC},      {"Space", 0x20},
-    {"Tab", 0x09},        {"Return", 0x0D},       {"Backspace", 0x08},    {"UpArrow", 0x26},        {"DownArrow", 0x28},
-    {"LeftArrow", 0x25},  {"RightArrow", 0x27},   {"KeypadDivide", 0x6F}, {"KeypadMultiply", 0x6A}, {"KeypadMinus", 0x6D},
-    {"KeypadPlus", 0x6B}, {"KeypadPeriod", 0x6E}, {"KeypadEnter", 0x0D},
+    {.name = "Home", .code = 0x24},
+    {.name = "End", .code = 0x23},
+    {.name = "Insert", .code = 0x2D},
+    {.name = "Delete", .code = 0x2E},
+    {.name = "PageUp", .code = 0x21},
+    {.name = "PageDown", .code = 0x22},
+    {.name = "Pause", .code = 0x13},
+    {.name = "ScrollLock", .code = 0x91},
+    {.name = "Backquote", .code = 0xC0},
+    {.name = "Minus", .code = 0xBD},
+    {.name = "Equals", .code = 0xBB},
+    {.name = "LeftBracket", .code = 0xDB},
+    {.name = "RightBracket", .code = 0xDD},
+    {.name = "Semicolon", .code = 0xBA},
+    {.name = "Quote", .code = 0xDE},
+    {.name = "Comma", .code = 0xBC},
+    {.name = "Period", .code = 0xBE},
+    {.name = "Slash", .code = 0xBF},
+    {.name = "Backslash", .code = 0xDC},
+    {.name = "Space", .code = 0x20},
+    {.name = "Tab", .code = 0x09},
+    {.name = "Return", .code = 0x0D},
+    {.name = "Backspace", .code = 0x08},
+    {.name = "UpArrow", .code = 0x26},
+    {.name = "DownArrow", .code = 0x28},
+    {.name = "LeftArrow", .code = 0x25},
+    {.name = "RightArrow", .code = 0x27},
+    {.name = "KeypadDivide", .code = 0x6F},
+    {.name = "KeypadMultiply", .code = 0x6A},
+    {.name = "KeypadMinus", .code = 0x6D},
+    {.name = "KeypadPlus", .code = 0x6B},
+    {.name = "KeypadPeriod", .code = 0x6E},
+    {.name = "KeypadEnter", .code = 0x0D},
 }};
 
 /// The virtual-key codes of the first key of each range of keys.
@@ -75,7 +101,7 @@ constexpr std::uint16_t k_FirstKeypadDigitCode = 0x60;
 	int value = 0;
 	for (const char c : text)
 	{
-		value = value * 10 + (c - '0');
+		value = (value * 10) + (c - '0');
 	}
 	return value;
 }
@@ -87,7 +113,9 @@ constexpr std::uint16_t k_FirstKeypadDigitCode = 0x60;
 	const auto lower = Lower(text);
 	if (lower.size() == 1 && std::isalpha(static_cast<unsigned char>(lower[0])) != 0)
 	{
-		return std::string(1, static_cast<char>(std::toupper(static_cast<unsigned char>(lower[0]))));
+		// Do not return a braced list here: it makes a text of two characters.
+		std::string letter(1, static_cast<char>(std::toupper(static_cast<unsigned char>(lower[0]))));
+		return letter;
 	}
 	if (lower.size() == 1 && std::isdigit(static_cast<unsigned char>(lower[0])) != 0)
 	{

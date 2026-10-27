@@ -48,6 +48,7 @@ private:
 void Fault(void* /*context*/)
 {
 	int* volatile address = nullptr;
+	// NOLINTNEXTLINE(clang-analyzer-core.NullDereference): the test makes an access violation on purpose.
 	*address = 1;
 }
 

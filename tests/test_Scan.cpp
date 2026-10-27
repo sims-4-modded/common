@@ -17,6 +17,7 @@ using namespace ts4_mod;
 // A small function with known bytes, in its own section of code in the test exe: it puts a constant into the result
 // register and returns. The bytes after the return are a marker, so that the signature matches only here.
 #pragma section(".ts4scan", read, execute)
+// NOLINTNEXTLINE(modernize-avoid-c-arrays): the test calls these bytes as a function, so they are a plain array.
 __declspec(allocate(".ts4scan")) extern const unsigned char k_KnownFunction[] = {
     0xB8, 0xDE, 0xC0, 0x57, 0x7E,                   // The function puts the constant into the result register.
     0xC3,                                           // The function returns.
@@ -90,8 +91,8 @@ TEST(Scan, DoesNotScanSectionsOfData)
 {
 	const auto module = TestExe();
 	// The bytes of this array are in a section of data only. The scan does not find them.
-	static const std::array<unsigned char, 12> k_DataOnly {0xCC, 0x5A, 0xA5, 0x13, 0x37, 0x99,
-	                                                       0x42, 0x24, 0x81, 0x18, 0x7F, 0xF7};
+	static constexpr std::array<unsigned char, 12> k_DataOnly {0xCC, 0x5A, 0xA5, 0x13, 0x37, 0x99,
+	                                                           0x42, 0x24, 0x81, 0x18, 0x7F, 0xF7};
 	const auto signature = MakeSignature("CC 5A A5 13 37 99 42 24 81 18 7F F7");
 	const auto found = FindUniqueSignature(module, signature.Bytes(), "DataOnly");
 	EXPECT_FALSE(found);

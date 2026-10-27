@@ -99,7 +99,7 @@ struct FakeExtender
 			return 1;
 		};
 		api.addSettings = [](void* c, const char* section, Ts4SettingsFn load, void* user) -> uint32_t {
-			static_cast<FakeExtender*>(c)->settings.push_back({section, load, user});
+			static_cast<FakeExtender*>(c)->settings.push_back({.section = section, .load = load, .user = user});
 			return 1;
 		};
 		api.saveSettings = [](void* c, const char* patch) -> uint32_t {
@@ -107,7 +107,8 @@ struct FakeExtender
 			return 1;
 		};
 		api.addField = [](void* c, const Ts4FieldDesc* field, Ts4FieldGetFn get, Ts4FieldSetFn set, void* user) -> uint32_t {
-			static_cast<FakeExtender*>(c)->fields.push_back({field->key, field->kind, get, set, user});
+			static_cast<FakeExtender*>(c)->fields.push_back(
+			    {.key = field->key, .kind = field->kind, .get = get, .set = set, .user = user});
 			return 1;
 		};
 		api.addAction = [](void*, const Ts4ActionDesc*, Ts4TaskFn, Ts4EnabledFn, void*) -> uint32_t { return 1; };
@@ -117,7 +118,7 @@ struct FakeExtender
 			static_cast<FakeExtender*>(c)->messages.emplace_back(text);
 		};
 		api.addQuery = [](void* c, const char* name, const char* /*help*/, Ts4QueryFn query, void* user) -> uint32_t {
-			static_cast<FakeExtender*>(c)->queries.push_back({name, query, user});
+			static_cast<FakeExtender*>(c)->queries.push_back({.name = name, .query = query, .user = user});
 			return 1;
 		};
 		api.listQueries = [](void* c, Ts4Text* list) {

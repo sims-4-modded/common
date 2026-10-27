@@ -18,7 +18,8 @@
 
 /// The table of the thunk stubs, one for each hook place, from the file HookThunk.asm. The C++ code gives one stub to
 /// MinHook for each hook place, because a code pointer cannot carry the place index.
-extern "C" void* HookThunkTable[]; // NOLINT(modernize-avoid-c-arrays)
+// NOLINTNEXTLINE(modernize-avoid-c-arrays, readability-identifier-naming): HookThunk.asm gives the name and the type.
+extern "C" void* HookThunkTable[];
 
 namespace ts4_mod
 {
@@ -63,11 +64,13 @@ struct Slot
 	bool inCallbacks = false;
 };
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables): the thunk and the hooks need this state.
 std::array<Slot, k_MaxHooks> s_slots;
 
 static_assert(k_MaxHooks == 64, "The file HookThunk.asm makes 64 stubs. Keep the two numbers the same.");
 
 /// The depth of the callbacks on this thread. The functions of the manager refuse to run in a callback.
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables): the state of each thread cannot be in an object.
 thread_local int t_callbackDepth = 0;
 
 [[nodiscard]] const char* PhaseName(HookPhase phase)
@@ -168,6 +171,7 @@ inline constexpr std::size_t k_MaxShadowDepth = 256;
 
 /// The calls with an AFTER callback that are in progress on this thread, newest last. The original functions return
 /// in the reverse order of the calls, so the thunk reads and removes the last frame.
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables): the state of each thread cannot be in an object.
 thread_local std::vector<ShadowFrame> t_shadow;
 } // namespace
 
@@ -341,6 +345,7 @@ ts4::Result<void> HookManager::AddCallback(const void* target, std::string_view 
 		}
 		return ts4::MakeError("no hook on {}: MinHook cannot make the hook: {}", functionName, MH_StatusToString(status));
 	}
+	// NOLINTNEXTLINE(modernize-make-unique): std::make_unique cannot use a designated initializer.
 	auto hook = std::unique_ptr<Hook>(new Hook {
 	    .manager = *this,
 	    .target = target,
@@ -444,6 +449,7 @@ void HookManager::RemoveAll()
 	}
 	const std::scoped_lock lock(_mutex);
 	std::vector<const void*> targets;
+	targets.reserve(_hooks.size());
 	for (const auto& [target, hook] : _hooks)
 	{
 		targets.push_back(target);

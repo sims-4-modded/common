@@ -48,7 +48,7 @@ template <typename T>
 {
 	// A name of eight characters has no terminating zero.
 	const auto* name = reinterpret_cast<const char*>(section.Name);
-	return std::string(name, strnlen(name, IMAGE_SIZEOF_SHORT_NAME));
+	return {name, strnlen(name, IMAGE_SIZEOF_SHORT_NAME)};
 }
 
 [[nodiscard]] std::string ModuleFileName(HMODULE module)
@@ -74,7 +74,7 @@ template <typename T>
 /// Hold a reference to a module. The deleter gives the reference back.
 [[nodiscard]] std::shared_ptr<void> HoldModule(HMODULE module)
 {
-	return std::shared_ptr<void>(module, [](void* handle) { FreeLibrary(static_cast<HMODULE>(handle)); });
+	return {module, [](void* handle) { FreeLibrary(static_cast<HMODULE>(handle)); }};
 }
 } // namespace
 
@@ -135,7 +135,7 @@ ts4::Result<ImageLayout> ReadImageLayout(std::span<const std::byte> headers)
 	const auto tableStart = optionalStart + file->SizeOfOptionalHeader;
 	for (std::size_t index = 0; index < file->NumberOfSections; ++index)
 	{
-		const auto section = ReadAt<IMAGE_SECTION_HEADER>(headers, tableStart + index * sizeof(IMAGE_SECTION_HEADER));
+		const auto section = ReadAt<IMAGE_SECTION_HEADER>(headers, tableStart + (index * sizeof(IMAGE_SECTION_HEADER)));
 		if (!section)
 		{
 			return ts4::MakeError("the section table does not fit in the headers");
@@ -202,7 +202,7 @@ ts4::Result<ModuleImage> ModuleImage::Find(std::string_view name)
 	}
 	const auto wide = ToWide(name);
 	HMODULE module = nullptr;
-	if (!GetModuleHandleExW(0, wide.c_str(), &module) || module == nullptr)
+	if (GetModuleHandleExW(0, wide.c_str(), &module) == FALSE || module == nullptr)
 	{
 		return ts4::MakeError("the module {} is not loaded", name);
 	}
@@ -213,7 +213,7 @@ ts4::Result<ModuleImage> ModuleImage::Containing(const void* address)
 {
 	HMODULE module = nullptr;
 	if (address == nullptr ||
-	    !GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS, static_cast<LPCWSTR>(address), &module) ||
+	    GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS, static_cast<LPCWSTR>(address), &module) == FALSE ||
 	    module == nullptr)
 	{
 		return ts4::MakeError("no loaded module holds the address");

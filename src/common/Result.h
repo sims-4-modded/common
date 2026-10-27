@@ -31,11 +31,13 @@ template <typename T>
 class [[nodiscard]] Result
 {
 public:
+	// NOLINTNEXTLINE(google-explicit-constructor): a function returns a value or an Error, and this makes the Result.
 	Result(T value)
 	    : _state(std::move(value))
 	{
 	}
 
+	// NOLINTNEXTLINE(google-explicit-constructor): a function returns a value or an Error, and this makes the Result.
 	Result(Error error)
 	    : _state(std::move(error))
 	{
@@ -67,6 +69,7 @@ class [[nodiscard]] Result<void>
 public:
 	Result() = default;
 
+	// NOLINTNEXTLINE(google-explicit-constructor): a function returns a value or an Error, and this makes the Result.
 	Result(Error error)
 	    : _error(std::move(error))
 	    , _failed(true)

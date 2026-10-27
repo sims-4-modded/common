@@ -58,6 +58,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+// This file is also a C header. C has no `using` alias, and in C an empty parameter list does not mean no parameters.
+// NOLINTBEGIN(modernize-use-using, modernize-redundant-void-arg)
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -273,5 +275,6 @@ typedef void (*Ts4ModShutdownFn)(void);
 #ifdef __cplusplus
 }
 #endif
+// NOLINTEND(modernize-use-using, modernize-redundant-void-arg)
 
 #endif // TS4_MOD_API_H

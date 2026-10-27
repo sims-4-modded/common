@@ -22,7 +22,7 @@ namespace
 
 [[nodiscard]] bool ProcessHasForeground()
 {
-	const auto window = GetForegroundWindow();
+	auto* const window = GetForegroundWindow();
 	if (window == nullptr)
 	{
 		return false;

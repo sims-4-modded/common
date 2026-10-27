@@ -67,7 +67,7 @@ DWORD CallWithHandler(GuardContext& guard, ExceptionFilter filter)
 	{
 		if (code == 0)
 		{
-			code = static_cast<DWORD>(EXCEPTION_NONCONTINUABLE_EXCEPTION);
+			code = EXCEPTION_NONCONTINUABLE_EXCEPTION;
 		}
 	}
 	return code;

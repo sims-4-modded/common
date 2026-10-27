@@ -28,7 +28,7 @@ public:
 		{
 			return swap;
 		}
-		auto value = expected;
+		auto* value = expected;
 		if (std::atomic_ref<void*>(*slot).compare_exchange_strong(value, replacement))
 		{
 			swap._slot = slot;
@@ -63,7 +63,7 @@ public:
 		{
 			return true;
 		}
-		auto value = _replacement;
+		auto* value = _replacement;
 		const auto restored = std::atomic_ref<void*>(*_slot).compare_exchange_strong(value, _original);
 		_slot = nullptr;
 		return restored;

@@ -105,13 +105,27 @@ struct ModHost::Entry
 		}
 		catch (const std::exception& error)
 		{
-			host->Log(TS4_LOG_ERROR, std::format("{}: an exception: {}", name, error.what()));
+			LogException(error.what());
 		}
 		catch (...)
 		{
-			host->Log(TS4_LOG_ERROR, std::format("{}: an unknown exception", name));
+			LogException(nullptr);
 		}
 		return false;
+	}
+
+	/// Write an exception to the log. `what` is null for an exception that is not a std::exception.
+	void LogException(const char* what) const noexcept
+	{
+		try
+		{
+			host->Log(TS4_LOG_ERROR, what != nullptr ? std::format("{}: an exception: {}", name, what)
+			                                         : std::format("{}: an unknown exception", name));
+		}
+		catch (...)
+		{
+			// The log failed. Do not let this exception go into the extender.
+		}
 	}
 };
 

@@ -2,6 +2,7 @@
  * Copyright (c) 2026 Sims 4 mods developers
  *****************************************************************************/
 
+#include <array>
 #include <filesystem>
 #include <map>
 #include <optional>
@@ -37,7 +38,7 @@ void FakeDecRef(PyObject* object)
 void FakeExport() {}
 
 /// The names of the core exports. A fake interpreter that has only these exports has all groups off.
-constexpr std::string_view k_CoreExports[] = {
+constexpr auto k_CoreExports = std::to_array<std::string_view>({
     "Py_IsInitialized",
     "PyGILState_Ensure",
     "PyGILState_Release",
@@ -50,7 +51,7 @@ constexpr std::string_view k_CoreExports[] = {
     "PyObject_Str",
     "PyObject_GetAttrString",
     "PyUnicode_AsUTF8AndSize",
-};
+});
 
 [[nodiscard]] void* FakeResolve(const char* name)
 {
@@ -225,6 +226,7 @@ TEST(PythonApi, AReferenceCountsItsCopies)
 		auto first = PyRef::Steal(*api, python);
 		EXPECT_EQ(object.references, 1);
 		{
+			// NOLINTNEXTLINE(performance-unnecessary-copy-initialization): the test checks the copy.
 			const auto copy = first;
 			EXPECT_EQ(object.references, 2);
 			auto assigned = PyRef::Borrow(*api, python);
@@ -235,6 +237,7 @@ TEST(PythonApi, AReferenceCountsItsCopies)
 		EXPECT_EQ(object.references, 1);
 		auto moved = std::move(first);
 		EXPECT_EQ(object.references, 1);
+		// NOLINTNEXTLINE(bugprone-use-after-move): the test checks the reference after the move.
 		EXPECT_FALSE(first);
 		EXPECT_EQ(moved.Get(), python);
 		auto* released = moved.Release();
@@ -322,11 +325,19 @@ TEST_F(PythonInterpreter, ImportsAndCalls)
 
 TEST_F(PythonInterpreter, AnotherThreadGetsTheGil)
 {
-	long long value = 0;
+	std::int64_t value = 0;
 	std::thread([&] {
-		const GilGuard gil(Api());
-		const auto result = Api().Eval("2 ** 10");
-		value = result ? Api().ToInteger(result->Get()).Value() : -1;
+		// An exception that goes out of the thread stops the process. Thus the thread catches the exception.
+		try
+		{
+			const GilGuard gil(Api());
+			const auto result = Api().Eval("2 ** 10");
+			value = result ? Api().ToInteger(result->Get()).Value() : -1;
+		}
+		catch (const std::exception&)
+		{
+			value = -2;
+		}
 	}).join();
 	EXPECT_EQ(value, 1024);
 }

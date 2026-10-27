@@ -25,6 +25,7 @@ struct FakeMethod
 	const char* name;
 };
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables): the fake functions cannot get their state in another way.
 int s_calls = 0;
 
 void OriginalCode()

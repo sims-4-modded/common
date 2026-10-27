@@ -94,7 +94,7 @@ namespace detail
 		}
 		else if (token.size() == 2 && detail::HexDigit(token[0]) >= 0 && detail::HexDigit(token[1]) >= 0)
 		{
-			byte.value = static_cast<std::uint8_t>(detail::HexDigit(token[0]) * 16 + detail::HexDigit(token[1]));
+			byte.value = static_cast<std::uint8_t>((detail::HexDigit(token[0]) * 16) + detail::HexDigit(token[1]));
 			fixed = true;
 		}
 		else
@@ -133,11 +133,12 @@ struct FixedSignature
 
 /// Read a literal signature text at compile time. A text that is not correct stops the compile.
 template <std::size_t N>
+// NOLINTNEXTLINE(modernize-avoid-c-arrays): the parameter takes a literal text, with its length.
 [[nodiscard]] consteval auto MakeSignature(const char (&text)[N])
 {
 	static_assert(N > 1, "the signature text is empty");
 	// Each token has one character or more, and a space after it, so the text has at most N / 2 bytes.
-	FixedSignature<N / 2 + 1> signature;
+	FixedSignature<(N / 2) + 1> signature;
 	signature.text = std::string_view(text, N - 1);
 	const auto read = ReadSignature(signature.text, signature.bytes);
 	if (!read.Correct())

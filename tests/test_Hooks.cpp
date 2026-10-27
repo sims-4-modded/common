@@ -4,6 +4,7 @@
 
 #include <cstdint>
 
+#include <array>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -24,13 +25,16 @@ using TestFunction = std::uintptr_t (*)(std::uintptr_t, std::uintptr_t, std::uin
 /// The functions that the tests hook. Each one has a different body, so the linker cannot fold them into one.
 __declspec(noinline) std::uintptr_t AddDigits(std::uintptr_t a, std::uintptr_t b, std::uintptr_t c, std::uintptr_t d)
 {
-	return a * 1000 + b * 100 + c * 10 + d;
+	return (a * 1000) + (b * 100) + (c * 10) + d;
 }
 
 __declspec(noinline) std::uintptr_t MultiplyPairs(std::uintptr_t a, std::uintptr_t b, std::uintptr_t c, std::uintptr_t d)
 {
-	return a * b + c * d;
+	return (a * b) + (c * d);
 }
+
+// The hooked functions and the tests cannot get their state in another way.
+// NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variables)
 
 // The tests call the functions through these pointers. The compiler cannot see the function behind a volatile
 // pointer, so each call goes to the first byte of the function, where the hook is.
@@ -72,6 +76,7 @@ template <class Function>
 void Fault()
 {
 	int* volatile address = nullptr;
+	// NOLINTNEXTLINE(clang-analyzer-core.NullDereference): the test makes an access violation on purpose.
 	*address = 1;
 }
 
@@ -82,7 +87,7 @@ using Function8 = std::uintptr_t (*)(std::uintptr_t, std::uintptr_t, std::uintpt
 __declspec(noinline) std::uintptr_t EightArguments(std::uintptr_t a, std::uintptr_t b, std::uintptr_t c, std::uintptr_t d,
                                                    std::uintptr_t e, std::uintptr_t f, std::uintptr_t g, std::uintptr_t h)
 {
-	return a + b * 2 + c * 3 + d * 4 + e * 5 + f * 6 + g * 7 + h * 8;
+	return a + (b * 2) + (c * 3) + (d * 4) + (e * 5) + (f * 6) + (g * 7) + (h * 8);
 }
 Function8 volatile s_eight = &EightArguments;
 
@@ -91,8 +96,8 @@ Function8 volatile s_eight = &EightArguments;
 using FunctionMixed = double (*)(int, double, int, double, double, int);
 __declspec(noinline) double MixedArguments(int a, double x, int b, double y, double z, int c)
 {
-	return static_cast<double>(a) + x * 10.0 + static_cast<double>(b) * 100.0 + y * 1000.0 + z * 10000.0 +
-	       static_cast<double>(c) * 100000.0;
+	return static_cast<double>(a) + (x * 10.0) + (static_cast<double>(b) * 100.0) + (y * 1000.0) + (z * 10000.0) +
+	       (static_cast<double>(c) * 100000.0);
 }
 FunctionMixed volatile s_mixed = &MixedArguments;
 
@@ -100,7 +105,7 @@ FunctionMixed volatile s_mixed = &MixedArguments;
 using FunctionDoubles = double (*)(double, double, double, double, double, double);
 __declspec(noinline) double SumDoubles(double a, double b, double c, double d, double e, double f)
 {
-	return a + b * 2.0 + c * 4.0 + d * 8.0 + e * 16.0 + f * 32.0;
+	return a + (b * 2.0) + (c * 4.0) + (d * 8.0) + (e * 16.0) + (f * 32.0);
 }
 FunctionDoubles volatile s_doubles = &SumDoubles;
 
@@ -114,7 +119,7 @@ struct Thing
 using FunctionStruct = std::uintptr_t (*)(const Thing*);
 __declspec(noinline) std::uintptr_t ReadThing(const Thing* thing)
 {
-	return thing->first * 10 + thing->second;
+	return (thing->first * 10) + thing->second;
 }
 FunctionStruct volatile s_struct = &ReadThing;
 
@@ -147,12 +152,14 @@ FunctionThrow volatile s_throw = &ThrowIf42;
 std::uint32_t volatile s_walkFrames = 0;
 __declspec(noinline) std::uintptr_t WalkStack(std::uintptr_t x)
 {
-	void* frames[32] = {};
-	s_walkFrames = RtlCaptureStackBackTrace(0, 32, frames, nullptr);
+	std::array<void*, 32> frames {};
+	s_walkFrames = RtlCaptureStackBackTrace(0, static_cast<DWORD>(frames.size()), frames.data(), nullptr);
 	return x + 1;
 }
 using FunctionWalk = std::uintptr_t (*)(std::uintptr_t);
 FunctionWalk volatile s_walk = &WalkStack;
+
+// NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 
 } // namespace
 
@@ -563,11 +570,11 @@ TEST(Hooks, ADeepRecursionThroughAHookReturnsTheCorrectResult)
 	                                 Callback(1, "after", HookPhase::After, 1, [&](const Ts4Call&) { ++afterCount; })));
 	// The recursion goes deeper than the shadow stack. A level that is deeper than the bound runs only the original
 	// function, so the result stays correct and the shadow stack cannot grow without a bound.
-	constexpr std::uintptr_t depth = 1000;
-	const auto result = s_countDown(depth);
-	EXPECT_EQ(result, depth * (depth + 1) / 2);
+	constexpr std::uintptr_t k_Depth = 1000;
+	const auto result = s_countDown(k_Depth);
+	EXPECT_EQ(result, k_Depth * (k_Depth + 1) / 2);
 	// Each level of the recursion is a main-thread call, so each ran the before callbacks.
-	EXPECT_EQ(beforeCount, depth + 1);
+	EXPECT_EQ(beforeCount, k_Depth + 1);
 	// Only the levels inside the bound of the shadow stack ran the after callbacks.
 	EXPECT_GT(afterCount, 0u);
 	EXPECT_LE(afterCount, beforeCount);

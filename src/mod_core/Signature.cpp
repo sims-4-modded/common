@@ -84,9 +84,9 @@ SignatureMatches FindSignature(std::span<const std::byte> memory, std::span<cons
 	const auto* const begin = reinterpret_cast<const unsigned char*>(memory.data());
 	const auto* const end = begin + memory.size();
 	const std::boyer_moore_horspool_searcher searcher(needle.begin(), needle.end());
-	for (auto cursor = begin; cursor < end;)
+	for (const auto* cursor = begin; cursor < end;)
 	{
-		const auto found = searcher(cursor, end).first;
+		const auto* const found = searcher(cursor, end).first;
 		if (found == end)
 		{
 			break;

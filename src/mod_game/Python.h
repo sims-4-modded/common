@@ -112,9 +112,12 @@ private:
 class PythonApi
 {
 public:
+	// Each member has the name of its export. The macro cannot put a type or a parameter list in parentheses.
+	// NOLINTBEGIN(readability-identifier-naming, bugprone-macro-parentheses)
 #define TS4_PYTHON_MEMBER(group, result, name, parameters) result(*name) parameters = nullptr;
 	TS4_PYTHON_FUNCTIONS(TS4_PYTHON_MEMBER)
 #undef TS4_PYTHON_MEMBER
+	// NOLINTEND(readability-identifier-naming, bugprone-macro-parentheses)
 
 	/// Find the exports in the loaded module `moduleName`. Return an error if the module is not loaded, or if a core
 	/// export is missing. A missing export of a group turns off only that group.
@@ -151,8 +154,8 @@ public:
 	[[nodiscard]] ts4::Result<PyRef> Call(PyObject* callable) const;
 
 	/// The value of a Python int that fits in 64 bits.
-	[[nodiscard]] ts4::Result<long long> ToInteger(PyObject* object) const;
-	[[nodiscard]] ts4::Result<PyRef> FromInteger(long long value) const;
+	[[nodiscard]] ts4::Result<std::int64_t> ToInteger(PyObject* object) const;
+	[[nodiscard]] ts4::Result<PyRef> FromInteger(std::int64_t value) const;
 	[[nodiscard]] ts4::Result<PyRef> FromText(std::string_view text) const;
 
 private:

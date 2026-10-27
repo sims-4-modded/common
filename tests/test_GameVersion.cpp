@@ -19,6 +19,7 @@ namespace
 std::vector<std::byte> VersionFile(std::string_view text, std::size_t length)
 {
 	std::vector<std::byte> bytes;
+	bytes.reserve(4 + text.size());
 	for (std::size_t index = 0; index < 4; ++index)
 	{
 		bytes.push_back(static_cast<std::byte>((length >> (8 * index)) & 0xFF));

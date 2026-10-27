@@ -65,7 +65,7 @@ TEST(StartupDecision, AFailedStartWithTheMenuBarKeepsTheMenuBarOff)
 	const auto decision = DecideStartup(FormatStartupMarker(MakeMarker(k_Overlay)), k_Overlay);
 	EXPECT_TRUE(decision.lastStartFailed);
 	ASSERT_TRUE(decision.lastStart);
-	EXPECT_EQ(decision.lastStart->stage, "menu bar");
+	EXPECT_EQ(decision.lastStart.value_or(StartupMarker {}).stage, "menu bar");
 	EXPECT_EQ(decision.featuresOff, k_Overlay);
 	EXPECT_TRUE(decision.featuresOn.empty());
 }
@@ -106,6 +106,7 @@ TEST(StartupSequence, TheStepsOccurOneTimeAtTheirFrames)
 {
 	StartupSequence sequence(StartupPlan {.lateStartFrame = 3, .stableFrames = 4});
 	std::vector<StartupStep> steps;
+	steps.reserve(20);
 	for (int frame = 0; frame < 20; ++frame)
 	{
 		steps.push_back(sequence.OnFrame());

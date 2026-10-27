@@ -29,7 +29,7 @@ void AddName(std::string& list, const char* name)
 
 PyRef PyRef::Steal(const PythonApi& api, PyObject* object)
 {
-	return PyRef(api.Py_IncRef, api.Py_DecRef, object);
+	return {api.Py_IncRef, api.Py_DecRef, object};
 }
 
 PyRef PyRef::Borrow(const PythonApi& api, PyObject* object)
@@ -38,7 +38,7 @@ PyRef PyRef::Borrow(const PythonApi& api, PyObject* object)
 	{
 		api.Py_IncRef(object);
 	}
-	return PyRef(api.Py_IncRef, api.Py_DecRef, object);
+	return {api.Py_IncRef, api.Py_DecRef, object};
 }
 
 PyRef::PyRef(const PyRef& other)
@@ -96,7 +96,7 @@ void PyRef::Reset()
 
 ts4::Result<PythonApi> PythonApi::Find(std::string_view moduleName)
 {
-	const auto module = GetModuleHandleW(ToWide(moduleName).c_str());
+	auto* const module = GetModuleHandleW(ToWide(moduleName).c_str());
 	if (module == nullptr)
 	{
 		return ts4::MakeError("{} is not loaded", moduleName);
@@ -134,6 +134,8 @@ ts4::Result<PythonApi> PythonApi::Resolve(std::string moduleName, const std::fun
 		}
 		return missingCore;
 	};
+// The macro cannot put a type or a parameter list in parentheses.
+// NOLINTBEGIN(bugprone-macro-parentheses)
 #define TS4_PYTHON_LOAD(group, result, name, parameters)               \
 	api.name = reinterpret_cast<result(*) parameters>(resolve(#name)); \
 	if (api.name == nullptr)                                           \
@@ -142,6 +144,7 @@ ts4::Result<PythonApi> PythonApi::Resolve(std::string moduleName, const std::fun
 	}
 	TS4_PYTHON_FUNCTIONS(TS4_PYTHON_LOAD)
 #undef TS4_PYTHON_LOAD
+	// NOLINTEND(bugprone-macro-parentheses)
 
 	if (!missingCore.empty())
 	{
@@ -319,7 +322,7 @@ ts4::Result<PyRef> PythonApi::Call(PyObject* callable) const
 	return Owned(PyObject_CallObject(callable, nullptr), "call");
 }
 
-ts4::Result<long long> PythonApi::ToInteger(PyObject* object) const
+ts4::Result<std::int64_t> PythonApi::ToInteger(PyObject* object) const
 {
 	if (auto needed = Need(PythonFeature::Values, "an integer"); !needed)
 	{
@@ -337,7 +340,7 @@ ts4::Result<long long> PythonApi::ToInteger(PyObject* object) const
 	return value;
 }
 
-ts4::Result<PyRef> PythonApi::FromInteger(long long value) const
+ts4::Result<PyRef> PythonApi::FromInteger(std::int64_t value) const
 {
 	if (auto needed = Need(PythonFeature::Values, "an integer"); !needed)
 	{

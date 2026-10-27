@@ -27,7 +27,7 @@ struct FakeKeyboard
 
 	[[nodiscard]] HotkeyInput MakeInput()
 	{
-		return HotkeyInput([this](std::uint16_t key) { return down.contains(key); }, [this] { return focus; });
+		return {[this](std::uint16_t key) { return down.contains(key); }, [this] { return focus; }};
 	}
 };
 

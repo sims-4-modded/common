@@ -174,7 +174,7 @@ template <typename S, typename Check>
 		break;
 	}
 	// The menu bar never makes settings that the file would refuse.
-	if (ts4::Result<void> checked = check(next); !checked)
+	if (const ts4::Result<void> checked = check(next); !checked)
 	{
 		return ts4::MakeError("the change of '{}' is not correct: {}", FieldPath(field), checked.GetError().message);
 	}

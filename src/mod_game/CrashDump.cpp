@@ -50,6 +50,7 @@ struct DumpState
 	CrashDumpReason reason = CrashDumpReason::None;
 };
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables): the exception handler needs this state.
 DumpState s_dump;
 
 [[nodiscard]] const char* ReasonName(CrashDumpReason reason)
@@ -73,7 +74,7 @@ DumpState s_dump;
 {
 	HMODULE module = nullptr;
 	constexpr DWORD k_Flags = GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT;
-	if (address == nullptr || !GetModuleHandleExW(k_Flags, static_cast<LPCWSTR>(address), &module))
+	if (address == nullptr || GetModuleHandleExW(k_Flags, static_cast<LPCWSTR>(address), &module) == FALSE)
 	{
 		return std::format("{} (no module)", address);
 	}
@@ -87,7 +88,7 @@ void WriteOneDump(int number)
 {
 	auto path = s_dump.path;
 	path += number == 1 ? L".dmp" : std::format(L"-{}.dmp", number);
-	const auto file = CreateFileW(path.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+	auto* const file = CreateFileW(path.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
 	BOOL written = FALSE;
 	if (file != INVALID_HANDLE_VALUE)
 	{
@@ -109,8 +110,8 @@ void WriteOneDump(int number)
 		spdlog::critical("crash dump: thread {} had {} (exception 0x{:08X} at {}, data address {}); {}", s_dump.threadId,
 		                 ReasonName(s_dump.reason), static_cast<std::uint32_t>(record->ExceptionCode),
 		                 DescribeAddress(record->ExceptionAddress), dataAddress,
-		                 written ? std::format("the dump is in {}", ToUtf8(path.wstring()))
-		                         : std::format("the dump failed with error {}", error));
+		                 written != FALSE ? std::format("the dump is in {}", ToUtf8(path.wstring()))
+		                                  : std::format("the dump failed with error {}", error));
 		spdlog::default_logger()->flush();
 	}
 	catch (...)
@@ -196,7 +197,7 @@ ts4::Result<std::filesystem::path> InstallCrashDumpWriter(const std::filesystem:
 		return ts4::MakeError("the folder {} of the crash dumps is in the game folder", ToUtf8(folder.wstring()));
 	}
 	// dbghelp.dll comes from the system folder only. The game folder gets no DLL of the extender.
-	const auto dbghelp = LoadLibraryExW(L"dbghelp.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
+	auto* const dbghelp = LoadLibraryExW(L"dbghelp.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
 	if (dbghelp == nullptr)
 	{
 		return ts4::MakeError("the system has no dbghelp.dll (error {})", GetLastError());
@@ -220,7 +221,7 @@ ts4::Result<std::filesystem::path> InstallCrashDumpWriter(const std::filesystem:
 	{
 		return ts4::MakeError("CreateEventW failed with error {}", GetLastError());
 	}
-	const auto worker = CreateThread(nullptr, 0, DumpWorker, nullptr, 0, nullptr);
+	auto* const worker = CreateThread(nullptr, 0, DumpWorker, nullptr, 0, nullptr);
 	if (worker == nullptr)
 	{
 		return ts4::MakeError("the worker thread of the crash dumps did not start (error {})", GetLastError());

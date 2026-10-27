@@ -34,10 +34,10 @@ TEST(CrashDumpRules, OtherAccessViolationsGetNoDump)
 
 TEST(CrashDumpRules, OtherExceptionsGetNoDump)
 {
-	constexpr uint32_t breakpoint = 0x80000003;
-	constexpr uint32_t cppException = 0xE06D7363;
-	EXPECT_EQ(DecideCrashDump(breakpoint, 0x10ff8, k_Stack), CrashDumpReason::None);
-	EXPECT_EQ(DecideCrashDump(cppException, 0x10ff8, k_Stack), CrashDumpReason::None);
+	constexpr uint32_t k_Breakpoint = 0x80000003;
+	constexpr uint32_t k_CppException = 0xE06D7363;
+	EXPECT_EQ(DecideCrashDump(k_Breakpoint, 0x10ff8, k_Stack), CrashDumpReason::None);
+	EXPECT_EQ(DecideCrashDump(k_CppException, 0x10ff8, k_Stack), CrashDumpReason::None);
 }
 
 TEST(CrashDumpRules, AnEmptyStackRangeGetsNoDump)
