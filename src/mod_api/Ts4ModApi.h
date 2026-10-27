@@ -30,10 +30,11 @@
  * - The simulation thread runs the simulation, the game Python and the cheat commands. A call from a script mod
  *   or from game Python into a DLL mod comes on this thread, not on the main thread.
  *
- * A function callback runs on the thread that calls the native function. The functions that the main loop of the
- * client calls run on the main thread. The swap chain of the game presents on a third thread, the render thread: the
- * menu bar draws there, but it calls no function of a mod there. A mod must know the thread of each function that it
- * hooks.
+ * A function callback runs only on the main thread. A call of a hooked function on another thread runs only the
+ * original function, with no callback. A call of the same function from one of its callbacks also runs only the
+ * original function. The functions that the main loop of the client calls run on the main thread. The swap chain
+ * of the game presents on a third thread, the render thread: the menu bar draws there, but it calls no function of
+ * a mod there. A mod must know the thread of each function that it hooks.
  *
  * The first call of each settings function comes in the first tick, after all inits and before the first work of the
  * tick. A mod can call `log`, `postTask` and `listQueries` of the table from any thread. To change the state of the
