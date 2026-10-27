@@ -15,6 +15,8 @@ tools\preset.bat x64-release
 
 Run `ctest --preset x64-release` for the test suite. The tests of `Python.h` need Python 3.7: set `TS4_PYTHON37` to
 its folder, or install it for the `py -3.7` launcher.
+Run `python tools\check.py` for the format and lint checks of CI (the tool versions are in
+`tools\requirements-check.txt`).
 
 ## How to install
 
