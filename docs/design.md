@@ -4,9 +4,7 @@ In this file, `<workspace>` is the folder that holds `projects`: this repository
 and a worktree of it is `<workspace>\worktrees\<name>`. The environment variable `TS4_WORKSPACE` can give another
 folder.
 
-The code is a port of the shared code of the Masters of Albion mods (`projects/common` of that workspace) for this
-game. The Unity and IL2CPP parts are not in it: a native function of the game has a signature in place of a managed
-method.
+A native function of the game is found by its signature in its module.
 
 ## What is in it
 
@@ -55,7 +53,7 @@ The C++ namespaces (`ts4`, `ts4_mod`, `ts4_mod::sdk`, `ts4_mod::settings`) do no
 ## The Windows parts in the game
 
 `ts4_mod_game` (`src/mod_game`, only on Windows) holds the parts of the extender and the DLL mods that run in the
-game process. It is a port of `mod_game` of the Masters of Albion mods, with no IL2CPP and no managed code:
+game process:
 
 | File | What it does |
 |---|---|
@@ -69,7 +67,7 @@ game process. It is a port of `mod_game` of the Masters of Albion mods, with no 
 | `Python.h` | `PythonApi`: the `Py*` exports of the loaded `python37_x64.dll`, which it finds one time with `GetProcAddress`. `GilGuard` holds the GIL, `PyRef` owns a reference, and each Python exception becomes a `Result` error. A missing export turns off only its group of functions. |
 
 The code uses no RVA: a function of the game comes from a signature in its module. The messages on the screen of
-the game (`GameMessages` of Masters of Albion) are not in this library, because they need the UI of this game.
+the game are not in this library, because they need the UI of this game.
 
 MinHook comes from its source archive (`cmake/ModMinHook.cmake`, target `ts4_minhook`) and builds as a static library,
 because the vcpkg port of MinHook is a DLL. The archive goes into the download folder of vcpkg on the first configure.
@@ -129,8 +127,7 @@ sequenceDiagram
 
 ## The interface between the extender and a mod
 
-`src/mod_api/Ts4ModApi.h` is a versioned C interface (`TS4_MOD_API_VERSION`, now 1), on the model of the Masters of
-Albion mod loader. Only plain C types go across it, because the extender and each mod have their own C runtime and
+`src/mod_api/Ts4ModApi.h` is a versioned C interface (`TS4_MOD_API_VERSION`, now 1). Only plain C types go across it, because the extender and each mod have their own C runtime and
 their own copy of the standard library.
 
 A DLL mod exports `Ts4ModApiVersion`, `Ts4ModGetInfo`, `Ts4ModInit` and `Ts4ModShutdown`. The extender refuses a mod
